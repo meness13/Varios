@@ -1,0 +1,67 @@
+import cv2
+import numpy as np
+import time
+def detect_color(image, lower_color, upper_color):
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, lower_color, upper_color)
+    mask = cv2.erode(mask, None, iterations=2)
+    mask = cv2.dilate(mask, None, iterations=2)
+    cnts, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return cnts, mask
+
+def get_contour_center(contour):
+    M = cv2.moments(contour)
+    if M["m00"] != 0:
+        center_x = int(M["m10"] / M["m00"])
+        center_y = int(M["m01"] / M["m00"])
+        return (center_x, center_y)
+    else:
+        return None
+
+cap = cv2.VideoCapture(0)
+
+# Define the red and blue color ranges in HSV
+blue_lower = np.array([100, 150, 50])
+blue_upper = np.array([140, 255, 255])
+red_lower = np.array([0, 120, 70])
+red_upper = np.array([10, 255, 255])
+
+# Variable to store fixed red object position
+fixed_red_position = None
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Detect colors
+    blue_cnts, _ = detect_color(frame, blue_lower, blue_upper)
+    red_cnts, _ = detect_color(frame, red_lower, red_upper)
+
+    if len(red_cnts) > 0:
+        # Use the largest red contour to set as fixed position
+        largest_red_contour = max(red_cnts, key=cv2.contourArea)
+        fixed_red_position = get_contour_center(largest_red_contour)
+        if fixed_red_position:
+            cv2.circle(frame, fixed_red_position, 5, (0, 0, 255), -1)
+
+    if len(blue_cnts) > 0 and fixed_red_position:
+        # Use the largest blue contour to calculate the position
+        largest_blue_contour = max(blue_cnts, key=cv2.contourArea)
+        blue_position = get_contour_center(largest_blue_contour)
+        if blue_position:
+            cv2.circle(frame, blue_position, 5, (255, 0, 0), -1)
+            # Draw a line between red and blue positions
+            cv2.line(frame, fixed_red_position, blue_position, (255, 255, 255), 2)
+            
+            # Calculate the relative position
+            relative_position = (blue_position[0] - fixed_red_position[0], blue_position[1] - fixed_red_position[1])
+            print("Relative Position of Blue Object:", relative_position)
+
+    cv2.imshow('Frame', frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+

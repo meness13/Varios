@@ -1,0 +1,66 @@
+import cv2
+import numpy as np
+
+# Inicializar la captura de video
+video = cv2.VideoCapture(0)
+
+# Definir el rango de color verde en HSV
+lower_green = np.array([50, 100, 100])
+upper_green = np.array([70, 255, 255])
+
+# Definir el rango de color azul en HSV
+lower_blue = np.array([110, 50, 50])
+upper_blue = np.array([130, 255, 255])
+
+while True:
+    ret, frame = video.read()
+    if not ret:
+        break
+
+    # Convertir a espacio de color HSV
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Crear una máscara para el color verde
+    green_mask = cv2.inRange(hsv, lower_green, upper_green)
+    # Crear una máscara para el color azul
+    blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
+
+    # Encontrar contornos para el color verde
+    green_contours, _ = cv2.findContours(green_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # Encontrar contornos para el color azul
+    blue_contours, _ = cv2.findContours(blue_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Suponer que el primer contorno es el punto verde
+    if green_contours:
+        M_green = cv2.moments(green_contours[0])
+        if M_green['m00'] != 0:
+            green_cx = int(M_green['m10']/M_green['m00'])
+            green_cy = int(M_green['m01']/M_green['m00'])
+            # Dibujar un círculo en el centroide verde
+            cv2.circle(frame, (green_cx, green_cy), 5, (0, 255, 0), -1)
+
+    # Suponer que el primer contorno es el objeto azul
+    if blue_contours:
+        M_blue = cv2.moments(blue_contours[0])
+        if M_blue['m00'] != 0:
+            blue_cx = int(M_blue['m10']/M_blue['m00'])
+            blue_cy = int(M_blue['m01']/M_blue['m00'])
+            # Dibujar un círculo en el centroide azul
+            cv2.circle(frame, (blue_cx, blue_cy), 5, (255, 0, 0), -1)
+
+            # Si ambos colores han sido detectados, calcular la posición relativa
+            if 'green_cx' in locals() and 'green_cy' in locals():
+                relative_pos = (blue_cx - green_cx, blue_cy - green_cy)
+                print(f'Posición relativa del azul respecto al verde: {relative_pos}')
+
+    # Mostrar el frame
+    cv2.imshow('Frame', frame)
+
+    # Salir con 'ESC'
+    k = cv2.waitKey(5) & 0xFF
+    if k == 27:
+        break
+
+# Liberar la cámara y cerrar todas las ventanas
+video.release()
+cv2.destroyAllWindows()
